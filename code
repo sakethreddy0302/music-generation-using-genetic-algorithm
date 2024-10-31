@@ -1,0 +1,84 @@
+import random
+import numpy as np
+from midiutil import MIDIFile
+
+def new1(length, scale, tempo, population_size=100, num_generations=50, mutation_rate=0.1, crossover_range=(0.3, 0.7)):
+    track = 0
+    channel = 0
+    time = 0
+    duration = 1
+
+    # Define note ranges for major and minor scales
+    major_scales = {
+        "A": [81, 71, 73, 74, 76, 78, 80],
+        "B": [82, 83, 73, 75, 76, 78, 80],
+        "C": [69, 71, 72, 62, 64, 65, 67],
+        "D": [81, 83, 85, 86, 76, 78, 79],
+        "E": [81, 83, 85, 87, 88, 78, 80],
+        "F": [69, 70, 72, 74, 76, 77, 67],
+        "G": [81, 83, 84, 86, 88, 90, 91]
+    }
+    minor_scales = {
+        "A": [81, 69, 71, 72, 74, 76, 77],
+        "B": [82, 70, 72, 73, 75, 77, 79],
+        "C": [69, 70, 72, 63, 65, 67, 68],
+        "D": [81, 69, 71, 72, 74, 76, 77],
+        "E": [81, 69, 71, 72, 74, 76, 77],
+        "F": [69, 70, 72, 73, 75, 77, 79],
+        "G": [81, 69, 71, 72, 74, 75, 77]
+    }
+
+    # Check if the scale is valid
+    scale_parts = scale.split()
+    if len(scale_parts) != 2 or scale_parts[0] not in major_scales or scale_parts[1] not in ["major", "minor"]:
+        print("Error: Invalid scale input.")
+        return
+
+    scale_key, scale_type = scale_parts[0], scale_parts[1]
+    note_range = major_scales[scale_key] if scale_type == "major" else minor_scales[scale_key]
+
+    midi = MIDIFile(1)
+    midi.addTempo(track, time, tempo)
+
+    population = [[random.choice(note_range) for _ in range(length)] for _ in range(population_size)]
+
+    def fitness(melody):
+        diffs = [abs(melody[i] - melody[i+1]) for i in range(len(melody)-1)]
+        return sum(diffs)
+
+    for generation in range(num_generations):
+        fitness_values = [fitness(melody) for melody in population]
+        selected_indices = np.argsort(fitness_values)[:population_size // 2]
+        selected_population = [population[i] for i in selected_indices]
+
+        offspring = []
+        for _ in range(population_size - len(selected_population)):
+            parent1, parent2 = random.sample(selected_population, 2)
+            crossover_point = random.randint(int(crossover_range[0] * length), int(crossover_range[1] * length))
+            child = parent1[:crossover_point] + parent2[crossover_point:]
+            offspring.append(child)
+
+        for i in range(len(offspring)):
+            if random.random() < mutation_rate * (1 - generation / num_generations):  # Dynamic mutation rate
+                mutation_point = random.randint(0, length - 1)
+                offspring[i][mutation_point] = random.choice(note_range)
+
+        population = selected_population + offspring
+
+    best_melody = min(population, key=fitness)
+
+    for note in best_melody:
+        midi.addNote(track, channel, note, time, duration, volume=100)
+        time += 1
+
+    with open("new1.mid", "wb") as f:
+        midi.writeFile(f)
+
+if _name_ == "_main_":
+    length = int(input("Enter the length of the melody: "))
+    scale = input("Enter the scale (e.g., 'A major' or 'B minor'): ")
+    tempo = int(input("Enter the tempo (beats per minute): "))
+
+    new1(length, scale, tempo)
+
+    print("Melody generated successfully! Check 'new1.mid'.")
